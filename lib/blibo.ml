@@ -2,6 +2,23 @@ type ('key, 'value) tree =
   | Leaf
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
+let rec fold f state = function
+  | Leaf -> state
+  | Node (keys, values, children) ->
+      let rec for_all_children state pos =
+        if pos = Array.length keys then
+          fold f state (Array.unsafe_get children pos)
+        else
+          let cur_key = Array.unsafe_get keys pos in
+          let cur_val = Array.unsafe_get values pos in
+          let state = f state cur_key cur_val in
+          for_all_children state (pos + 1)
+      in
+      for_all_children state 0
+
+let print_in_order tree =
+  fold (fun _ key value -> Printf.printf "%i, %s\n" key value) () tree
+
 let max_children = 3
 
 let rec find find_key tree =
