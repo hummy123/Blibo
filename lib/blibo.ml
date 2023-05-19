@@ -98,6 +98,7 @@ let rec insert ins_key ins_value tree =
           else
             (* Must rebalance after insert call. *)
             (* Must also specify previous and next children. *)
+            (* This case is impossible to reach for binary trees (having two children) *)
             let ins_child =
               insert ins_key ins_value (Array.unsafe_get children (pos - 1))
             in
@@ -107,7 +108,7 @@ let rec insert ins_key ins_value tree =
 
 let gen_test_tree =
   let lst =
-    [
+    [|
       (1, "1");
       (100, "100");
       (20, "20");
@@ -115,6 +116,6 @@ let gen_test_tree =
       (80, "80");
       (60, "60");
       (50, "50");
-    ]
+    |]
   in
-  List.fold_left (fun tree (key, value) -> insert key value tree) Leaf lst
+  Array.fold_left (fun tree (key, value) -> insert key value tree) Leaf lst
