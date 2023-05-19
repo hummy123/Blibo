@@ -59,6 +59,7 @@ let rec insert ins_key ins_value tree =
       let rec array_search pos =
         if pos = Array.length keys then
           (* Must absorb after this if needed - but no absorb logic yet. *)
+          (* Must also update calling tree with child returned from insert. *)
           insert ins_key ins_value
             (Array.unsafe_get children (Array.length children - 1))
         else
