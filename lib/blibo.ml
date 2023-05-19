@@ -16,9 +16,7 @@ let rec fold f state = function
       in
       for_all_children state 0
 
-let print_in_order tree =
-  fold (fun _ key value -> Printf.printf "%i, %s\n" key value) () tree
-
+let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
 let max_children = 3
 
 let rec find find_key tree =
@@ -60,8 +58,11 @@ let rec insert ins_key ins_value tree =
         if pos = Array.length keys then
           (* Must absorb after this if needed - but no absorb logic yet. *)
           (* Must also update calling tree with child returned from insert. *)
-          insert ins_key ins_value
-            (Array.unsafe_get children (Array.length children - 1))
+          let children =
+            insert ins_key ins_value
+              (Array.unsafe_get children (Array.length children - 1))
+          in
+          Node (keys, values, [| children |])
         else
           let cur_key = Array.unsafe_get keys pos in
           if cur_key = ins_key then
@@ -80,9 +81,29 @@ let rec insert ins_key ins_value tree =
             (* Implicit: if above if-statements don't match, then cur_key is greater than ins_key. *)
           else if pos = 0 then
             (* Must rebalance after insert call. *)
-            insert ins_key ins_value (Array.unsafe_get children 0)
+            let children =
+              insert ins_key ins_value (Array.unsafe_get children 0)
+            in
+            Node (keys, values, [| children |])
           else
             (* Must rebalance after insert call. *)
-            insert ins_key ins_value (Array.unsafe_get children (pos - 1))
+            let children =
+              insert ins_key ins_value (Array.unsafe_get children (pos - 1))
+            in
+            Node (keys, values, [| children |])
       in
       array_search 0
+
+let gen_test_tree =
+  let lst =
+    [
+      (1, "1");
+      (100, "100");
+      (20, "20");
+      (40, "40");
+      (80, "80");
+      (60, "60");
+      (50, "50");
+    ]
+  in
+  List.fold_left (fun tree (key, value) -> insert key value tree) Leaf lst
