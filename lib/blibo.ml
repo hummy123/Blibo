@@ -78,9 +78,8 @@ let rec insert ins_key ins_value tree =
               Array.sub values pos (Array.length values - pos)
             in
             let new_values =
-              Array.append values new_values_start
-              |> Array.append [| ins_value |]
-              |> Array.append new_values_end
+              Array.append [| ins_value |] new_values_end
+              |> Array.append new_values_start
             in
             Node (keys, new_values, children)
           else if cur_key < ins_key then array_search (pos + 1)
@@ -99,23 +98,36 @@ let rec insert ins_key ins_value tree =
             (* Must rebalance after insert call. *)
             (* Must also specify previous and next children. *)
             (* This case is impossible to reach for binary trees (having two children) *)
+            let prev_children = Array.sub children 0 pos in
+            let next_children =
+              Array.sub children (pos + 1) (Array.length children - pos)
+            in
             let ins_child =
               insert ins_key ins_value (Array.unsafe_get children (pos - 1))
             in
-            Node (keys, values, [| ins_child |])
+            let children =
+              Array.append [| ins_child |] next_children
+              |> Array.append prev_children
+            in
+            Node (keys, values, children)
       in
       array_search 0
 
 let gen_test_tree =
-  let lst =
-    [|
-      (1, "1");
-      (100, "100");
-      (20, "20");
-      (40, "40");
-      (80, "80");
-      (60, "60");
-      (50, "50");
-    |]
-  in
+  let lst = [| (5, '5'); (4, '4'); (6, '6'); (3, '3'); (7, '7') |] in
   Array.fold_left (fun tree (key, value) -> insert key value tree) Leaf lst
+
+let _ =
+  Node
+    ( [| 5 |],
+      [| '5' |],
+      [|
+        Node
+          ( [| 4 |],
+            [| '4' |],
+            [| Node ([| 3 |], [| '3' |], [| Leaf; Leaf |]); Leaf |] );
+        Node
+          ( [| 6 |],
+            [| '6' |],
+            [| Leaf; Node ([| 7 |], [| '7' |], [| Leaf; Leaf |]) |] );
+      |] )
