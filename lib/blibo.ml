@@ -23,6 +23,10 @@ let rec fold f state tree =
   in
   for_all_children state 0
 
+let is_empty tree =
+  let (Node (keys, _, _)) = tree in
+  Array.length keys = 0
+
 let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
 let max_children = 3
 
@@ -42,6 +46,16 @@ let rec find find_key tree =
   in
   array_search 0
 
-let is_empty tree =
-  let (Node (keys, _, _)) = tree in
-  Array.length keys = 0
+let rec insert ins_key ins_val tree =
+  let rec ins pos tree =
+    let (Node (keys, values, children)) = tree in
+    if pos = Array.length keys then
+      if Array.length children = 0 then
+        let keys = Array.append keys [| ins_key |] in
+        let values = Array.append values [| ins_val |] in
+        (* Must check if number of keys is above maximum and split if so. *)
+        Node (keys, values, children)
+      else insert ins_key ins_val (Array.unsafe_get children pos)
+    else failwith ""
+  in
+  ins 0 tree
