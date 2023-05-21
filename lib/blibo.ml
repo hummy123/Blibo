@@ -47,8 +47,8 @@ let rec find find_key tree =
   array_search 0
 
 let rec insert ins_key ins_val tree =
-  let rec ins pos tree =
-    let (Node (keys, values, children)) = tree in
+  let (Node (keys, values, children)) = tree in
+  let rec array_ins pos =
     if pos = Array.length keys then
       if Array.length children = 0 then
         let keys = Array.append keys [| ins_key |] in
@@ -56,6 +56,27 @@ let rec insert ins_key ins_val tree =
         (* Must check if number of keys is above maximum and split if so. *)
         Node (keys, values, children)
       else insert ins_key ins_val (Array.unsafe_get children pos)
-    else failwith ""
+    else
+      let cur_key = Array.unsafe_get keys pos in
+      if ins_key = cur_key then (
+        let values = Array.copy values in
+        Array.unsafe_set values pos ins_val;
+        Node (keys, values, children))
+      else if ins_key > cur_key then array_ins (pos + 1)
+        (* Implicit: if above if-statements don't match, then cur_key is greater than find_key. *)
+      else if Array.length children = 0 then
+        let prev_keys = Array.sub keys 0 pos in
+        let next_keys = Array.sub keys pos (Array.length keys - pos) in
+        let keys =
+          Array.append [| ins_key |] next_keys |> Array.append prev_keys
+        in
+        let prev_values = Array.sub values 0 pos in
+        let next_values = Array.sub values pos (Array.length keys - pos) in
+        let values =
+          Array.append [| ins_val |] next_values |> Array.append prev_values
+        in
+        (* Must check if number of keys is above maximum and split if so. *)
+        Node (keys, values, children)
+      else insert ins_key ins_val (Array.unsafe_get children pos)
   in
-  ins 0 tree
+  array_ins 0
