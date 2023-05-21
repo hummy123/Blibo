@@ -77,13 +77,25 @@ let insert_at_pos arr ins_val pos =
 let rec insert ins_key ins_val tree =
   let (Node (keys, values, children)) = tree in
   let rec array_ins pos =
-    if pos = Array.length keys then
+    if pos = Array.length keys then (
       if Array.length children = 0 then
         let keys = Array.append keys [| ins_key |] in
         let values = Array.append values [| ins_val |] in
-        (* Must check if number of keys is above maximum and split if so. *)
         split_median keys values children
-      else insert ins_key ins_val (Array.unsafe_get children pos)
+      else
+        let (Node (child_keys, child_values, child_children) as child_node) =
+          insert ins_key ins_val
+            (Array.unsafe_get children (Array.length children - 1))
+        in
+        if Array.length child_keys = 1 then
+          let keys = Array.append keys child_keys in
+          let values = Array.append values child_values in
+          let children = Array.append children child_children in
+          split_median keys values children
+        else
+          let children = Array.copy children in
+          Array.unsafe_set children pos child_node;
+          Node (keys, values, children))
     else
       let cur_key = Array.unsafe_get keys pos in
       if ins_key = cur_key then (
@@ -96,10 +108,42 @@ let rec insert ins_key ins_val tree =
         let keys = insert_at_pos keys ins_key pos in
         let values = insert_at_pos values ins_val pos in
         split_median keys values children
-      else insert ins_key ins_val (Array.unsafe_get children pos)
+      else
+        let (Node (child_keys, child_values, child_children) as child) =
+          insert ins_key ins_val (Array.unsafe_get children pos)
+        in
+        if Array.length child_keys = 1 then
+          (* Called split_median after recursing, so need to add to current branch. *)
+          let keys = insert_at_pos keys (Array.unsafe_get child_keys 0) pos in
+          let values =
+            insert_at_pos values (Array.unsafe_get child_values 0) pos
+          in
+          let half_children =
+            insert_at_pos children (Array.unsafe_get child_children 1) pos
+          in
+          let children =
+            insert_at_pos half_children (Array.unsafe_get child_children 0) pos
+          in
+          split_median keys values children
+        else
+          (* Set child.  *)
+          let children = Array.copy children in
+          Array.unsafe_set children pos child;
+          Node (keys, values, children)
   in
   array_ins 0
 
 let test_tree =
   let arr = [| 1; 2; 3; 4; 5; 6; 7; 8; 9 |] in
   Array.fold_left (fun tree el -> insert el el tree) empty arr
+
+let _ =
+  Node
+    ( [| 2; 4 |],
+      [| 2; 4 |],
+      [|
+        Node ([| 1 |], [| 1 |], [||]);
+        Node ([| 3; 4 |], [| 3; 4 |], [||]);
+        Node ([| 5; 9 |], [| 5; 9 |], [||]);
+        Node ([| 5 |], [| 5 |], [||]);
+      |] )
