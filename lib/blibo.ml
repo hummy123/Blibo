@@ -1,9 +1,7 @@
 type ('key, 'value) tree =
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
-let max_children = 7
-let max_keys = max_children - 1
-let min_keys = max_children / 2
+let max_children = 3
 
 (* An empty B-Tree *)
 let empty = Node ([||], [||], [||])
@@ -30,7 +28,6 @@ let is_empty tree =
   Array.length keys = 0
 
 let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
-let max_children = 3
 
 let rec find find_key tree =
   let (Node (keys, values, children)) = tree in
@@ -52,18 +49,20 @@ let split_median keys values children =
   if Array.length keys = max_children then
     let half = max_children / 2 in
     let prev_keys = Array.sub keys 0 half in
-    let next_keys = Array.sub keys (half + 1) (Array.length keys - half) in
+    let next_keys = Array.sub keys (half + 1) (Array.length keys - half - 1) in
     let median_key = [| Array.unsafe_get keys half |] in
 
     let prev_values = Array.sub values 0 half in
-    let next_values = Array.sub values (half + 1) (Array.length keys - half) in
+    let next_values =
+      Array.sub values (half + 1) (Array.length keys - half - 1)
+    in
     let median_value = [| Array.unsafe_get values half |] in
 
     let prev_children, next_children =
       if Array.length children = 0 then ([||], [||])
       else
         ( Array.sub children 0 half,
-          Array.sub children half (Array.length keys - half) )
+          Array.sub children half (Array.length keys - half - 1) )
     in
     let left = Node (prev_keys, prev_values, prev_children) in
     let right = Node (next_keys, next_values, next_children) in
@@ -78,8 +77,12 @@ let rec insert ins_key ins_val tree =
         let keys = Array.append keys [| ins_key |] in
         let values = Array.append values [| ins_val |] in
         (* Must check if number of keys is above maximum and split if so. *)
-        Node (keys, values, children)
-      else insert ins_key ins_val (Array.unsafe_get children pos)
+        split_median keys values children
+      else
+        let (Node (keys, values, children)) =
+          insert ins_key ins_val (Array.unsafe_get children pos)
+        in
+        split_median keys values children
     else
       let cur_key = Array.unsafe_get keys pos in
       if ins_key = cur_key then (
@@ -99,9 +102,12 @@ let rec insert ins_key ins_val tree =
         let values =
           Array.append [| ins_val |] next_values |> Array.append prev_values
         in
+        split_median keys values children
         (* Must check if number of keys is above maximum and split if so. *)
-        if Array.length keys = max_keys then failwith ""
-        else Node (keys, values, children)
       else insert ins_key ins_val (Array.unsafe_get children pos)
   in
   array_ins 0
+
+let test_tree =
+  let arr = [| 1; 2; 3 |] in
+  Array.fold_left (fun tree el -> insert el el tree) empty arr
