@@ -90,7 +90,7 @@ let rec insert ins_key ins_val tree =
         Array.unsafe_set values pos ins_val;
         Node (keys, values, children))
       else if ins_key > cur_key then array_ins (pos + 1)
-        (* Implicit: if above if-statements don't match, then cur_key is greater than find_key. *)
+        (* Implicit: if above if-statements don't match, then cur_key is greater than ins_key. *)
       else if Array.length children = 0 then
         let prev_keys = Array.sub keys 0 pos in
         let next_keys = Array.sub keys pos (Array.length keys - pos) in
@@ -98,16 +98,19 @@ let rec insert ins_key ins_val tree =
           Array.append [| ins_key |] next_keys |> Array.append prev_keys
         in
         let prev_values = Array.sub values 0 pos in
-        let next_values = Array.sub values pos (Array.length keys - pos) in
+        let next_values = Array.sub values pos (Array.length values - pos) in
         let values =
           Array.append [| ins_val |] next_values |> Array.append prev_values
         in
         split_median keys values children
-        (* Must check if number of keys is above maximum and split if so. *)
-      else insert ins_key ins_val (Array.unsafe_get children pos)
+      else
+        let (Node (keys, values, children)) =
+          insert ins_key ins_val (Array.unsafe_get children pos)
+        in
+        split_median keys values children
   in
   array_ins 0
 
 let test_tree =
-  let arr = [| 1; 2; 3 |] in
+  let arr = [| 1; 0 |] in
   Array.fold_left (fun tree el -> insert el el tree) empty arr
