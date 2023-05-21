@@ -62,7 +62,7 @@ let split_median keys values children =
       if Array.length children = 0 then ([||], [||])
       else
         ( Array.sub children 0 half,
-          Array.sub children half (Array.length keys - half - 1) )
+          Array.sub children (half + 1) (Array.length children - half - 1) )
     in
     let left = Node (prev_keys, prev_values, prev_children) in
     let right = Node (next_keys, next_values, next_children) in
@@ -87,14 +87,19 @@ let rec insert ins_key ins_val tree =
           insert ins_key ins_val
             (Array.unsafe_get children (Array.length children - 1))
         in
-        if Array.length child_keys = 1 then
+        if Array.length child_keys = 1 then (
           let keys = Array.append keys child_keys in
           let values = Array.append values child_values in
-          let children = Array.append children child_children in
-          split_median keys values children
+          let children =
+            Array.append children [| Array.unsafe_get child_children 1 |]
+          in
+          Array.unsafe_set children
+            (Array.length children - 2)
+            (Array.unsafe_get child_children 0);
+          split_median keys values children)
         else
           let children = Array.copy children in
-          Array.unsafe_set children pos child_node;
+          Array.unsafe_set children (Array.length children - 1) child_node;
           Node (keys, values, children))
     else
       let cur_key = Array.unsafe_get keys pos in
@@ -134,16 +139,5 @@ let rec insert ins_key ins_val tree =
   array_ins 0
 
 let test_tree =
-  let arr = [| 1; 2; 3; 4; 5; 6; 7; 8; 9 |] in
+  let arr = [| 1; 2; 3; 4; 5 |] in
   Array.fold_left (fun tree el -> insert el el tree) empty arr
-
-let _ =
-  Node
-    ( [| 2; 4 |],
-      [| 2; 4 |],
-      [|
-        Node ([| 1 |], [| 1 |], [||]);
-        Node ([| 3; 4 |], [| 3; 4 |], [||]);
-        Node ([| 5; 9 |], [| 5; 9 |], [||]);
-        Node ([| 5 |], [| 5 |], [||]);
-      |] )
