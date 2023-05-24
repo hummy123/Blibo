@@ -45,6 +45,8 @@ let rec find find_key tree =
   in
   array_search 0
 
+type insert = DidSplit | DidNotSplit
+
 let split_median keys values children =
   if Array.length keys = max_children then
     let half = max_children / 2 in
@@ -67,47 +69,49 @@ let split_median keys values children =
     in
     let left = Node (prev_keys, prev_values, prev_children) in
     let right = Node (next_keys, next_values, next_children) in
-    Node (median_key, median_value, [| left; right |])
-  else Node (keys, values, children)
+    (Node (median_key, median_value, [| left; right |]), DidSplit)
+  else (Node (keys, values, children), DidNotSplit)
 
 let insert_at_pos arr ins_val pos =
   let prev = Array.sub arr 0 pos in
   let next = Array.sub arr pos (Array.length arr - pos) in
   Array.append [| ins_val |] next |> Array.append prev
 
-let rec insert ins_key ins_val tree =
+let rec insert_internal ins_key ins_val tree =
   let (Node (keys, values, children)) = tree in
-  let rec array_ins pos =
+  let rec array_ins pos : ('a, 'b) tree * insert =
     if pos = Array.length keys then (
       if Array.length children = 0 then
         let keys = Array.append keys [| ins_key |] in
         let values = Array.append values [| ins_val |] in
         split_median keys values children
       else
-        let (Node (child_keys, child_values, child_children) as child_node) =
-          insert ins_key ins_val
+        let ( (Node (child_keys, child_values, child_children) as child_node),
+              did_split ) =
+          insert_internal ins_key ins_val
             (Array.unsafe_get children (Array.length children - 1))
         in
-        if Array.length child_keys = 1 then (
-          let keys = Array.append keys child_keys in
-          let values = Array.append values child_values in
-          let children =
-            Array.append children [| Array.unsafe_get child_children 1 |]
-          in
-          Array.unsafe_set children
-            (Array.length children - 2)
-            (Array.unsafe_get child_children 0);
-          split_median keys values children)
-        else
-          let children = Array.copy children in
-          Array.unsafe_set children (Array.length children - 1) child_node;
-          split_median keys values children)
+        match did_split with
+        | DidSplit ->
+            let keys = Array.append keys child_keys in
+            let values = Array.append values child_values in
+            let children =
+              Array.append children [| Array.unsafe_get child_children 1 |]
+            in
+            Array.unsafe_set children
+              (Array.length children - 2)
+              (Array.unsafe_get child_children 0);
+            split_median keys values children
+        | DidNotSplit ->
+            let children = Array.copy children in
+            Array.unsafe_set children (Array.length children - 1) child_node;
+            (Node (keys, values, children), DidNotSplit))
     else
       let cur_key = Array.unsafe_get keys pos in
       if ins_key = cur_key then (
         let values = Array.copy values in
         Array.unsafe_set values pos ins_val;
-        Node (keys, values, children))
+        (Node (keys, values, children), DidNotSplit))
       else if ins_key > cur_key then array_ins (pos + 1)
         (* Implicit: if above if-statements don't match, then cur_key is greater than ins_key. *)
       else if Array.length children = 0 then
@@ -115,35 +119,42 @@ let rec insert ins_key ins_val tree =
         let values = insert_at_pos values ins_val pos in
         split_median keys values children
       else
-        let (Node (child_keys, child_values, child_children) as child) =
-          insert ins_key ins_val (Array.unsafe_get children pos)
+        let ( (Node (child_keys, child_values, child_children) as child),
+              did_split ) =
+          insert_internal ins_key ins_val (Array.unsafe_get children pos)
         in
-        if Array.length child_keys = 1 then
-          (* Called split_median after recursing, so need to add to current branch. *)
-          let keys = insert_at_pos keys (Array.unsafe_get child_keys 0) pos in
-          let values =
-            insert_at_pos values (Array.unsafe_get child_values 0) pos
-          in
-          let half_children =
-            insert_at_pos children (Array.unsafe_get child_children 1) pos
-          in
-          let children =
-            insert_at_pos half_children (Array.unsafe_get child_children 0) pos
-          in
-          split_median keys values children
-        else
-          (* Set child.  *)
-          let children = Array.copy children in
-          Array.unsafe_set children pos child;
-          Node (keys, values, children)
+        match did_split with
+        | DidSplit ->
+            (* Called split_median after recursing, so need to add to current branch. *)
+            let keys = insert_at_pos keys (Array.unsafe_get child_keys 0) pos in
+            let values =
+              insert_at_pos values (Array.unsafe_get child_values 0) pos
+            in
+            let half_children =
+              insert_at_pos children (Array.unsafe_get child_children 1) pos
+            in
+            let children =
+              insert_at_pos half_children
+                (Array.unsafe_get child_children 0)
+                pos
+            in
+            split_median keys values children
+        | DidNotSplit ->
+            (* Set child.  *)
+            let children = Array.copy children in
+            Array.unsafe_set children pos child;
+            (Node (keys, values, children), DidNotSplit)
   in
   array_ins 0
+
+let insert key value tree =
+  let tree, _ = insert_internal key value tree in
+  tree
 
 let test_tree =
   let arr = [| 1; 2; 3; 4; 5; 6; 7; 8 |] in
   Array.fold_left (fun tree el -> insert el "" tree) empty arr
 
-(* Up to 7. *)
 let _ =
   Node
     ( [| 4 |],
@@ -157,21 +168,8 @@ let _ =
         Node
           ( [| 6 |],
             [| "" |],
-            [| Node ([| 5 |], [| "" |], [||]); Node ([| 7 |], [| "" |], [||]) |]
-          );
-      |] )
-
-(* Up to 8. *)
-let _ =
-  Node
-    ( [| 4; 6 |],
-      [| ""; "" |],
-      [|
-        Node
-          ( [| 2 |],
-            [| "" |],
-            [| Node ([| 1 |], [| "" |], [||]); Node ([| 3 |], [| "" |], [||]) |]
-          );
-        Node ([| 5 |], [| "" |], [||]);
-        Node ([| 7; 8 |], [| ""; "" |], [||]);
+            [|
+              Node ([| 5 |], [| "" |], [||]);
+              Node ([| 7; 8 |], [| ""; "" |], [||]);
+            |] );
       |] )
