@@ -135,35 +135,43 @@ let rec insert ins_key ins_val tree =
           (* Set child.  *)
           let children = Array.copy children in
           Array.unsafe_set children pos child;
-          split_median keys values children
+          Node (keys, values, children)
   in
   array_ins 0
 
 let test_tree =
-  let arr = [| 1; 2; 3; 4; 5; 6; 7; 8; 9 |] in
+  let arr = [| 1; 2; 3; 4; 5; 6; 7; 8 |] in
   Array.fold_left (fun tree el -> insert el "" tree) empty arr
 
+(* Up to 7. *)
 let _ =
   Node
-    ( [| 6 |],
+    ( [| 4 |],
       [| "" |],
       [|
         Node
-          ( [| 4 |],
+          ( [| 2 |],
             [| "" |],
-            [|
-              Node
-                ( [| 2 |],
-                  [| "" |],
-                  [|
-                    Node ([| 1 |], [| "" |], [||]);
-                    Node ([| 3 |], [| "" |], [||]);
-                  |] );
-              Node ([| 5 |], [| "" |], [||]);
-            |] );
-        Node
-          ( [| 8 |],
-            [| "" |],
-            [| Node ([| 7 |], [| "" |], [||]); Node ([| 9 |], [| "" |], [||]) |]
+            [| Node ([| 1 |], [| "" |], [||]); Node ([| 3 |], [| "" |], [||]) |]
           );
+        Node
+          ( [| 6 |],
+            [| "" |],
+            [| Node ([| 5 |], [| "" |], [||]); Node ([| 7 |], [| "" |], [||]) |]
+          );
+      |] )
+
+(* Up to 8. *)
+let _ =
+  Node
+    ( [| 4; 6 |],
+      [| ""; "" |],
+      [|
+        Node
+          ( [| 2 |],
+            [| "" |],
+            [| Node ([| 1 |], [| "" |], [||]); Node ([| 3 |], [| "" |], [||]) |]
+          );
+        Node ([| 5 |], [| "" |], [||]);
+        Node ([| 7; 8 |], [| ""; "" |], [||]);
       |] )
