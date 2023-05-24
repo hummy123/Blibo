@@ -58,10 +58,11 @@ let split_median keys values children =
     in
     let median_value = [| Array.unsafe_get values half |] in
 
+    (* Todo: Error might be below. *)
     let prev_children, next_children =
       if Array.length children = 0 then ([||], [||])
       else
-        ( Array.sub children 0 half,
+        ( Array.sub children 0 (half + 1),
           Array.sub children (half + 1) (Array.length children - half - 1) )
     in
     let left = Node (prev_keys, prev_values, prev_children) in
@@ -100,7 +101,7 @@ let rec insert ins_key ins_val tree =
         else
           let children = Array.copy children in
           Array.unsafe_set children (Array.length children - 1) child_node;
-          Node (keys, values, children))
+          split_median keys values children)
     else
       let cur_key = Array.unsafe_get keys pos in
       if ins_key = cur_key then (
@@ -134,10 +135,35 @@ let rec insert ins_key ins_val tree =
           (* Set child.  *)
           let children = Array.copy children in
           Array.unsafe_set children pos child;
-          Node (keys, values, children)
+          split_median keys values children
   in
   array_ins 0
 
 let test_tree =
-  let arr = [| 1; 2; 3; 4; 5 |] in
-  Array.fold_left (fun tree el -> insert el el tree) empty arr
+  let arr = [| 1; 2; 3; 4; 5; 6; 7; 8; 9 |] in
+  Array.fold_left (fun tree el -> insert el "" tree) empty arr
+
+let _ =
+  Node
+    ( [| 6 |],
+      [| "" |],
+      [|
+        Node
+          ( [| 4 |],
+            [| "" |],
+            [|
+              Node
+                ( [| 2 |],
+                  [| "" |],
+                  [|
+                    Node ([| 1 |], [| "" |], [||]);
+                    Node ([| 3 |], [| "" |], [||]);
+                  |] );
+              Node ([| 5 |], [| "" |], [||]);
+            |] );
+        Node
+          ( [| 8 |],
+            [| "" |],
+            [| Node ([| 7 |], [| "" |], [||]); Node ([| 9 |], [| "" |], [||]) |]
+          );
+      |] )

@@ -20,7 +20,7 @@ let build_btree () =
       let tree = Blibo.insert key num tree in
       loop (num + 1) tree
   in
-  loop 0 Leaf
+  loop 0 Blibo.empty
 
 let btree_fold tree = Blibo.fold (fun _ _ _ -> ()) () tree
 
