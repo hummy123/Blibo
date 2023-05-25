@@ -1,3 +1,11 @@
+(* 
+   Only have one case for B-Tree data type.
+   To detect whether node is child, just check if last array (recursive part)
+   is empty. If it is, then this is a leaf; else, it is a branch.
+
+   The elements are ordered, for (max_children = 3), by:
+     child[0] -> key/value[0] -> child[1] -> key/value[1] -> child[2]
+ *)
 type ('key, 'value) tree =
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
@@ -9,7 +17,10 @@ let empty = Node ([||], [||], [||])
 let rec fold f state tree =
   let (Node (keys, values, children)) = tree in
   let rec for_all_children state pos =
-    if pos = Array.length keys then fold f state (Array.unsafe_get children pos)
+    if pos = Array.length keys then
+      if Array.length children > 0 then
+        fold f state (Array.unsafe_get children pos)
+      else state
     else
       let cur_key = Array.unsafe_get keys pos in
       let cur_val = Array.unsafe_get values pos in
@@ -28,6 +39,11 @@ let is_empty tree =
   Array.length keys = 0
 
 let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
+
+type search = | Exact of int | Closest of int
+
+(* let binsearch key arr = *)
+
 
 let rec find find_key tree =
   let (Node (keys, values, children)) = tree in
@@ -152,24 +168,52 @@ let insert key value tree =
   tree
 
 let test_tree =
-  let arr = [| 1; 2; 3; 4; 5; 6; 7; 8 |] in
-  Array.fold_left (fun tree el -> insert el "" tree) empty arr
+  let rec ins num tree =
+    if num = 16 then tree else ins (num + 1) (insert num "" tree)
+  in
+  ins 0 empty
 
 let _ =
   Node
-    ( [| 4 |],
+    ( [| 7 |],
       [| "" |],
       [|
         Node
-          ( [| 2 |],
-            [| "" |],
-            [| Node ([| 1 |], [| "" |], [||]); Node ([| 3 |], [| "" |], [||]) |]
-          );
-        Node
-          ( [| 6 |],
+          ( [| 3 |],
             [| "" |],
             [|
-              Node ([| 5 |], [| "" |], [||]);
-              Node ([| 7; 8 |], [| ""; "" |], [||]);
+              Node
+                ( [| 1 |],
+                  [| "" |],
+                  [|
+                    Node ([| 0 |], [| "" |], [||]);
+                    Node ([| 2 |], [| "" |], [||]);
+                  |] );
+              Node
+                ( [| 5 |],
+                  [| "" |],
+                  [|
+                    Node ([| 4 |], [| "" |], [||]);
+                    Node ([| 6 |], [| "" |], [||]);
+                  |] );
+            |] );
+        Node
+          ( [| 11 |],
+            [| "" |],
+            [|
+              Node
+                ( [| 9 |],
+                  [| "" |],
+                  [|
+                    Node ([| 8 |], [| "" |], [||]);
+                    Node ([| 10 |], [| "" |], [||]);
+                  |] );
+              Node
+                ( [| 13 |],
+                  [| "" |],
+                  [|
+                    Node ([| 12 |], [| "" |], [||]);
+                    Node ([| 14; 15 |], [| ""; "" |], [||]);
+                  |] );
             |] );
       |] )
