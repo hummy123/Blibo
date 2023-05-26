@@ -1,5 +1,6 @@
 (* Just a standard, barebones AVL-Tree implementation copied from a formal proof
-   - not using one in standard library because that one may have optimisations while B-Tree doesn't. *)
+   - not using one in standard library because that one may have optimisations while B-Tree doesn't. 
+   Implementation ported from: https://isabelle.in.tum.de/library/HOL/HOL-Data_Structures/document.pdf . *)
 
 type ('key, 'value) avl_tree =
   | E

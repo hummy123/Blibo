@@ -10,6 +10,8 @@ type ('key, 'value) tree =
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
 let max_children = 16
+
+(* Hoping there will be fewer memory allocations by declaring empty array/tuple just once. *)
 let empty_arr = [||]
 let empty_arr_tuple = (empty_arr, empty_arr)
 
