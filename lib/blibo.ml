@@ -9,11 +9,15 @@
 type ('key, 'value) tree =
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
-let max_children = 32
+let max_children = 16
+
+let empty_arr = [||]
+let empty_arr_tuple = (empty_arr, empty_arr)
 
 (* An empty B-Tree *)
-let empty = Node ([||], [||], [||])
+let empty = Node (empty_arr, empty_arr, empty_arr)
 
+(* Traverse through array following order described at top comment on file. *)
 let rec fold f state tree =
   let (Node (keys, values, children)) = tree in
   let rec for_all_children state pos =
@@ -40,6 +44,11 @@ let is_empty tree =
 
 let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
 
+(* 
+   Binary search on array, intended for use on key array to find index of key.
+   If key is not in array, return an index close to where the key should be.
+   Caller should then check if the element at the returned index is equal to find_key.
+ *)
 let binary_search find_key arr =
   let rec search low high =
     if high >= low then
@@ -54,6 +63,8 @@ let binary_search find_key arr =
   in
   search 0 (Array.length arr - 1)
 
+(* Find a key in a tree if it exists. Returns an option.
+   Internally, uses binary_search on array to find correct key or index of child to check. *)
 let rec find find_key tree =
   let (Node (keys, values, children)) = tree in
   let idx = binary_search find_key keys in
@@ -68,8 +79,13 @@ let rec find find_key tree =
       find find_key (Array.unsafe_get children (idx + 1))
     else find find_key (Array.unsafe_get children idx)
 
+(* 
+   On insertion, we only want to split at a branch when a leaf below the branch was split. 
+   So have to send this information across when unwinding recursion.
+ *)
 type insert = DidSplit | DidNotSplit
 
+(* The standard B-Tree splitting/rebalancing algorithm. Nothing special, except that it returns whether the node was split or not. *)
 let split_median keys values children =
   if Array.length keys = max_children then
     let half = max_children / 2 in
@@ -83,9 +99,8 @@ let split_median keys values children =
     in
     let median_value = [| Array.unsafe_get values half |] in
 
-    (* Todo: Error might be below. *)
     let prev_children, next_children =
-      if Array.length children = 0 then ([||], [||])
+      if Array.length children = 0 then empty_arr_tuple
       else
         ( Array.sub children 0 (half + 1),
           Array.sub children (half + 1) (Array.length children - half - 1) )
@@ -95,20 +110,25 @@ let split_median keys values children =
     (Node (median_key, median_value, [| left; right |]), DidSplit)
   else (Node (keys, values, children), DidNotSplit)
 
+(* Insert into a specific index in an array - unused due to incomplete insert_internal function. *)
 let insert_at_pos arr ins_val pos =
   let prev = Array.sub arr 0 pos in
   let next = Array.sub arr pos (Array.length arr - pos) in
   Array.append [| ins_val |] next |> Array.append prev
 
+(* The insert function for B-Trees. Right now, it just supports insertion in increasing order: 0, 1, 2, 3, etc. *)
 let rec insert_internal ins_key ins_val tree =
   let (Node (keys, values, children)) = tree in
   let idx = binary_search ins_key keys in
+  (* Key to insert is greater than all keys in node. *)
   if idx = Array.length keys then (
     if Array.length children = 0 then
+      (* If this node is a leaf with no children, just append the key/value to the end and split if needed. *)
       let keys = Array.append keys [| ins_key |] in
       let values = Array.append values [| ins_val |] in
       split_median keys values children
     else
+      (* Insert into last child. *)
       let ( (Node (child_keys, child_values, child_children) as child_node),
             did_split ) =
         insert_internal ins_key ins_val
@@ -116,6 +136,7 @@ let rec insert_internal ins_key ins_val tree =
       in
       match did_split with
       | DidSplit ->
+          (* If below child did split, then add keys and values to end of this node and split if needed. *)
           let keys = Array.append keys child_keys in
           let values = Array.append values child_values in
           let children =
@@ -185,10 +206,12 @@ let rec insert_internal ins_key ins_val tree =
 (*       Array.unsafe_set children pos child; *)
 (*       (Node (keys, values, children), DidNotSplit) *)
 
+(* Instead of returning tuple like insert_internal, want public API to return just the tree. *)
 let insert key value tree =
   let tree, _ = insert_internal key value tree in
   tree
 
+(* Used for viewing the B-Tree and its order/balancning in utop. *)
 let test_tree =
   let rec ins num tree =
     if num = 16 then tree else ins (num + 1) (insert num "" tree)
