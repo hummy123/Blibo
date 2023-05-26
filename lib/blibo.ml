@@ -10,7 +10,6 @@ type ('key, 'value) tree =
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
 let max_children = 16
-
 let empty_arr = [||]
 let empty_arr_tuple = (empty_arr, empty_arr)
 
@@ -44,11 +43,11 @@ let is_empty tree =
 
 let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
 
-(* 
-   Binary search on array, intended for use on key array to find index of key.
-   If key is not in array, return an index close to where the key should be.
-   Caller should then check if the element at the returned index is equal to find_key.
- *)
+(*
+    Binary search on array, intended for use on key array to find index of key.
+    If key is not in array, return an index close to where the key should be.
+    Caller should then check if the element at the returned index is equal to find_key.
+*)
 let binary_search find_key arr =
   let rec search low high =
     if high >= low then
@@ -79,10 +78,10 @@ let rec find find_key tree =
       find find_key (Array.unsafe_get children (idx + 1))
     else find find_key (Array.unsafe_get children idx)
 
-(* 
-   On insertion, we only want to split at a branch when a leaf below the branch was split. 
-   So have to send this information across when unwinding recursion.
- *)
+(*
+    On insertion, we only want to split at a branch when a leaf below the branch was split.
+    So have to send this information across when unwinding recursion.
+*)
 type insert = DidSplit | DidNotSplit
 
 (* The standard B-Tree splitting/rebalancing algorithm. Nothing special, except that it returns whether the node was split or not. *)
@@ -172,6 +171,7 @@ let rec insert_internal ins_key ins_val tree =
 
     (* else *)
     failwith ""
+
 (* else if ins_key > cur_key then  *)
 (*   array_ins idx + 1 *)
 (*   (* Implicit: if above if-statements don't match, then cur_key is greater than ins_key. *) *)
