@@ -1,15 +1,15 @@
-(* 
-   Only have one case for B-Tree data type.
-   To detect whether node is child, just check if last array (recursive part)
-   is empty. If it is, then this is a leaf; else, it is a branch.
+(*
+    Only have one case for B-Tree data type.
+    To detect whether node is child, just check if last array (recursive part)
+    is empty. If it is, then this is a leaf; else, it is a branch.
 
-   The elements are ordered, for (max_children = 3), by:
-     child[0] -> key/value[0] -> child[1] -> key/value[1] -> child[2]
- *)
+    The elements are ordered, for (max_children = 3), by:
+      child[0] -> key/value[0] -> child[1] -> key/value[1] -> child[2]
+*)
 type ('key, 'value) tree =
   | Node of 'key array * 'value array * ('key, 'value) tree array
 
-let max_children = 3
+let max_children = 32
 
 (* An empty B-Tree *)
 let empty = Node ([||], [||], [||])
@@ -40,26 +40,33 @@ let is_empty tree =
 
 let to_list tree = fold (fun lst key value -> (key, value) :: lst) [] tree
 
-type search = | Exact of int | Closest of int
-
-(* let binsearch key arr = *)
-
+let binary_search find_key arr =
+  let rec search low high =
+    if high >= low then
+      let mid = low + ((high - low) / 2) in
+      let mid_key = Array.unsafe_get arr mid in
+      if mid_key = find_key then mid
+      else if mid_key < find_key then search (low + 1) high
+      else search low (mid - 1)
+    else
+      (* We want to return the closest greater than find_key if find_key is not found. *)
+      max high low
+  in
+  search 0 (Array.length arr - 1)
 
 let rec find find_key tree =
   let (Node (keys, values, children)) = tree in
-  let rec array_search pos =
-    if pos = Array.length keys then
-      if Array.length children = 0 then None
-      else find find_key (Array.unsafe_get children pos)
-    else
-      let cur_key = Array.unsafe_get keys pos in
-      if find_key = cur_key then Some (Array.unsafe_get values pos)
-      else if find_key > cur_key then array_search (pos + 1)
-        (* Implicit: if above if-statements don't match, then cur_key is greater than find_key. *)
-      else if Array.length children = 0 then None
-      else find find_key (Array.unsafe_get children pos)
-  in
-  array_search 0
+  let idx = binary_search find_key keys in
+  if idx = Array.length keys then
+    if Array.length children = 0 then None
+    else find find_key (Array.unsafe_get children idx)
+  else
+    let cur_key = Array.unsafe_get keys idx in
+    if find_key = cur_key then Some (Array.unsafe_get values idx)
+    else if Array.length children = 0 then None
+    else if find_key > cur_key then
+      find find_key (Array.unsafe_get children (idx + 1))
+    else find find_key (Array.unsafe_get children idx)
 
 type insert = DidSplit | DidNotSplit
 
@@ -95,73 +102,88 @@ let insert_at_pos arr ins_val pos =
 
 let rec insert_internal ins_key ins_val tree =
   let (Node (keys, values, children)) = tree in
-  let rec array_ins pos : ('a, 'b) tree * insert =
-    if pos = Array.length keys then (
-      if Array.length children = 0 then
-        let keys = Array.append keys [| ins_key |] in
-        let values = Array.append values [| ins_val |] in
-        split_median keys values children
-      else
-        let ( (Node (child_keys, child_values, child_children) as child_node),
-              did_split ) =
-          insert_internal ins_key ins_val
-            (Array.unsafe_get children (Array.length children - 1))
-        in
-        match did_split with
-        | DidSplit ->
-            let keys = Array.append keys child_keys in
-            let values = Array.append values child_values in
-            let children =
-              Array.append children [| Array.unsafe_get child_children 1 |]
-            in
-            Array.unsafe_set children
-              (Array.length children - 2)
-              (Array.unsafe_get child_children 0);
-            split_median keys values children
-        | DidNotSplit ->
-            let children = Array.copy children in
-            Array.unsafe_set children (Array.length children - 1) child_node;
-            (Node (keys, values, children), DidNotSplit))
+  let idx = binary_search ins_key keys in
+  if idx = Array.length keys then (
+    if Array.length children = 0 then
+      let keys = Array.append keys [| ins_key |] in
+      let values = Array.append values [| ins_val |] in
+      split_median keys values children
     else
-      let cur_key = Array.unsafe_get keys pos in
-      if ins_key = cur_key then (
-        let values = Array.copy values in
-        Array.unsafe_set values pos ins_val;
-        (Node (keys, values, children), DidNotSplit))
-      else if ins_key > cur_key then array_ins (pos + 1)
-        (* Implicit: if above if-statements don't match, then cur_key is greater than ins_key. *)
-      else if Array.length children = 0 then
-        let keys = insert_at_pos keys ins_key pos in
-        let values = insert_at_pos values ins_val pos in
-        split_median keys values children
-      else
-        let ( (Node (child_keys, child_values, child_children) as child),
-              did_split ) =
-          insert_internal ins_key ins_val (Array.unsafe_get children pos)
-        in
-        match did_split with
-        | DidSplit ->
-            (* Called split_median after recursing, so need to add to current branch. *)
-            let keys = insert_at_pos keys (Array.unsafe_get child_keys 0) pos in
-            let values =
-              insert_at_pos values (Array.unsafe_get child_values 0) pos
-            in
-            let half_children =
-              insert_at_pos children (Array.unsafe_get child_children 1) pos
-            in
-            let children =
-              insert_at_pos half_children
-                (Array.unsafe_get child_children 0)
-                pos
-            in
-            split_median keys values children
-        | DidNotSplit ->
-            (* Set child.  *)
-            let children = Array.copy children in
-            Array.unsafe_set children pos child;
-            (Node (keys, values, children), DidNotSplit)
-  in
-  array_ins 0
+      let ( (Node (child_keys, child_values, child_children) as child_node),
+            did_split ) =
+        insert_internal ins_key ins_val
+          (Array.unsafe_get children (Array.length children - 1))
+      in
+      match did_split with
+      | DidSplit ->
+          let keys = Array.append keys child_keys in
+          let values = Array.append values child_values in
+          let children =
+            Array.append children [| Array.unsafe_get child_children 1 |]
+          in
+          Array.unsafe_set children
+            (Array.length children - 2)
+            (Array.unsafe_get child_children 0);
+          split_median keys values children
+      | DidNotSplit ->
+          let children = Array.copy children in
+          Array.unsafe_set children (Array.length children - 1) child_node;
+          (Node (keys, values, children), DidNotSplit)
+      (* Commented out code for non-append/in-order insert - not relevant right now 
+       * and requires rewriting after using binary_search to find index. *))
+  else
+    (* let cur_key = Array.unsafe_get keys idx in *)
+    (* if ins_key = cur_key then  *)
+    (*   let values = Array.copy values in *)
+    (*   Array.unsafe_set values idx ins_val; *)
+    (*   (Node (keys, values, children), DidNotSplit) *)
+    (* else if ins_key > cur_key then *)
+    (*   if Array.length children = 0 then *)
+    (*     let keys = insert_at_pos keys ins_key (idx + 1) in *)
+    (*     let values = insert_at_pos values ins_val (idx + 1) in *)
+    (*     split_median keys values children *)
+    (*   else *)
+    (*     let (Node(child_keys, child_values, child_children) as child_node), did_split = *)
+    (*       insert_internal ins_key ins_val (Array.unsafe_get children (idx + 1)) *)
+    (*     in *)
+    (*     match did_split with *)
+    (*     | DidSplit -> *)
+
+    (* else *)
+    failwith ""
+(* else if ins_key > cur_key then  *)
+(*   array_ins idx + 1 *)
+(*   (* Implicit: if above if-statements don't match, then cur_key is greater than ins_key. *) *)
+(* else if Array.length children = 0 then *)
+(*   let keys = insert_at_pos keys ins_key idx in *)
+(*   let values = insert_at_pos values ins_val idx in *)
+(*   split_median keys values children *)
+(* else *)
+(*   let ( (Node (child_keys, child_values, child_children) as child), *)
+(*         did_split ) = *)
+(*     insert_internal ins_key ins_val (Array.unsafe_get children pos) *)
+(*   in *)
+(*   match did_split with *)
+(*   | DidSplit -> *)
+(*       (* Called split_median after recursing, so need to add to current branch. *) *)
+(*       let keys = insert_at_pos keys (Array.unsafe_get child_keys 0) pos in *)
+(*       let values = *)
+(*         insert_at_pos values (Array.unsafe_get child_values 0) pos *)
+(*       in *)
+(*       let half_children = *)
+(*         insert_at_pos children (Array.unsafe_get child_children 1) pos *)
+(*       in *)
+(*       let children = *)
+(*         insert_at_pos half_children *)
+(*           (Array.unsafe_get child_children 0) *)
+(*           pos *)
+(*       in *)
+(*       split_median keys values children *)
+(*   | DidNotSplit -> *)
+(*       (* Set child.  *) *)
+(*       let children = Array.copy children in *)
+(*       Array.unsafe_set children pos child; *)
+(*       (Node (keys, values, children), DidNotSplit) *)
 
 let insert key value tree =
   let tree, _ = insert_internal key value tree in
@@ -172,48 +194,3 @@ let test_tree =
     if num = 16 then tree else ins (num + 1) (insert num "" tree)
   in
   ins 0 empty
-
-let _ =
-  Node
-    ( [| 7 |],
-      [| "" |],
-      [|
-        Node
-          ( [| 3 |],
-            [| "" |],
-            [|
-              Node
-                ( [| 1 |],
-                  [| "" |],
-                  [|
-                    Node ([| 0 |], [| "" |], [||]);
-                    Node ([| 2 |], [| "" |], [||]);
-                  |] );
-              Node
-                ( [| 5 |],
-                  [| "" |],
-                  [|
-                    Node ([| 4 |], [| "" |], [||]);
-                    Node ([| 6 |], [| "" |], [||]);
-                  |] );
-            |] );
-        Node
-          ( [| 11 |],
-            [| "" |],
-            [|
-              Node
-                ( [| 9 |],
-                  [| "" |],
-                  [|
-                    Node ([| 8 |], [| "" |], [||]);
-                    Node ([| 10 |], [| "" |], [||]);
-                  |] );
-              Node
-                ( [| 13 |],
-                  [| "" |],
-                  [|
-                    Node ([| 12 |], [| "" |], [||]);
-                    Node ([| 14; 15 |], [| ""; "" |], [||]);
-                  |] );
-            |] );
-      |] )
