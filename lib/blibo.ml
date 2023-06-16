@@ -56,7 +56,7 @@ let binary_search find_key arr =
       let mid = low + ((high - low) / 2) in
       let mid_key = Array.unsafe_get arr mid in
       if mid_key = find_key then mid
-      else if mid_key < find_key then search (low + 1) high
+      else if mid_key < find_key then search (mid + 1) high
       else search low (mid - 1)
     else
       (* We want to return the closest greater than find_key if find_key is not found. *)
